@@ -1,0 +1,11 @@
+[package]
+name = "czi-rs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+description = "Pure Rust reader for Zeiss CZI microscopy files"
+
+[dependencies]
+roxmltree = "0.20"
+thiserror = "1.0"
+zstd = "0.13"
