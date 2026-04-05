@@ -16,6 +16,7 @@ czi-rs = "0.1.0"
 ## What it exposes
 
 - Open a `.czi` file once and reuse the handle.
+- Build a lightweight dataset summary via `summary()`.
 - Inspect file header data, subblock directory entries, and attachments.
 - Read parsed metadata from the embedded XML document.
 - Enumerate frame indices and decode planes into a `Bitmap`.
@@ -28,11 +29,13 @@ use czi_rs::{CziFile, Dimension, PlaneIndex};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut czi = CziFile::open("example.czi")?;
 
+    let summary = czi.summary()?;
     let version = czi.version();
     let sizes = czi.sizes()?;
     let metadata = czi.metadata()?;
 
     println!("CZI version: {}.{}", version.0, version.1);
+    println!("logical frames: {}", summary.logical_frame_count);
     println!("sizes: {sizes:?}");
     println!("channels: {}", metadata.channels.len());
 

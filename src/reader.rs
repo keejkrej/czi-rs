@@ -9,8 +9,9 @@ use crate::parse::{
     decode_subblock_bitmap, parse_file, read_attachment_blob, read_metadata_xml, read_raw_subblock,
 };
 use crate::types::{
-    AttachmentBlob, AttachmentInfo, Bitmap, Coordinate, Dimension, DirectorySubBlockInfo,
-    FileHeaderInfo, MetadataSummary, PlaneIndex, RawSubBlock, SubBlockStatistics,
+    AttachmentBlob, AttachmentInfo, Bitmap, Coordinate, DatasetSummary, Dimension,
+    DirectorySubBlockInfo, FileHeaderInfo, MetadataSummary, PlaneIndex, RawSubBlock,
+    SubBlockStatistics, SummaryChannel, SummaryScaling,
 };
 
 pub struct CziFile {
@@ -90,6 +91,58 @@ impl CziFile {
         }
 
         Ok(self.metadata.as_ref().unwrap())
+    }
+
+    pub fn summary(&mut self) -> Result<DatasetSummary> {
+        let sizes = self.sizes()?;
+        let metadata = self.metadata()?.clone();
+        let logical_frame_count = self.loop_indices()?.len();
+        let channel_pixel_types = self.channel_pixel_types();
+        let max_channel_count = metadata
+            .channels
+            .len()
+            .max(channel_pixel_types.keys().max().map(|index| index + 1).unwrap_or(0));
+        let channels = (0..max_channel_count)
+            .map(|index| {
+                let metadata_channel = metadata.channels.iter().find(|channel| channel.index == index);
+                SummaryChannel {
+                    index,
+                    name: metadata_channel.and_then(|channel| channel.name.clone()),
+                    color: metadata_channel.and_then(|channel| channel.color.clone()),
+                    pixel_type: metadata_channel
+                        .and_then(|channel| channel.pixel_type.map(|pixel_type| pixel_type.as_str().to_owned()))
+                        .or_else(|| {
+                            channel_pixel_types
+                                .get(&index)
+                                .map(|pixel_type| pixel_type.as_str().to_owned())
+                        }),
+                }
+            })
+            .collect();
+        let scaling = if metadata.scaling.x.is_some()
+            || metadata.scaling.y.is_some()
+            || metadata.scaling.z.is_some()
+            || metadata.scaling.unit.is_some()
+        {
+            Some(SummaryScaling {
+                x: metadata.scaling.x,
+                y: metadata.scaling.y,
+                z: metadata.scaling.z,
+                unit: metadata.scaling.unit.clone(),
+            })
+        } else {
+            None
+        };
+
+        Ok(DatasetSummary {
+            version_major: self.header.major.max(0) as u32,
+            version_minor: self.header.minor.max(0) as u32,
+            sizes: sizes.into_iter().collect(),
+            logical_frame_count,
+            channels,
+            pixel_type: metadata.image.pixel_type.map(|pixel_type| pixel_type.as_str().to_owned()),
+            scaling,
+        })
     }
 
     pub fn sizes(&self) -> Result<HashMap<String, usize>> {
