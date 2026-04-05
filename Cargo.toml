@@ -4,6 +4,21 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.74"
 description = "Pure Rust reader for Zeiss CZI microscopy files"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/czi-rs"
+repository = "https://github.com/keejkrej/czi-rs"
+keywords = ["czi", "zeiss", "microscopy", "bioimaging", "image"]
+categories = ["science", "multimedia::images", "parser-implementations"]
+include = [
+    "src/**/*",
+    "tests/**/*",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+]
 
 [dependencies]
 roxmltree = "0.20"
