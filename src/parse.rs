@@ -105,6 +105,7 @@ pub(crate) fn read_metadata_xml<R: Read + Seek>(reader: &mut R, offset: u64) -> 
     String::from_utf8(xml_bytes).map_err(|err| CziError::file_invalid_utf8(err.to_string()))
 }
 
+#[allow(dead_code)]
 pub(crate) fn read_attachment_blob<R: Read + Seek>(
     reader: &mut R,
     info: &AttachmentInfo,

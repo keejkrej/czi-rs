@@ -5,13 +5,11 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{CziError, Result};
 use crate::metadata::parse_metadata_xml;
-use crate::parse::{
-    decode_subblock_bitmap, parse_file, read_attachment_blob, read_metadata_xml, read_raw_subblock,
-};
+use crate::parse::{decode_subblock_bitmap, parse_file, read_metadata_xml, read_raw_subblock};
 use crate::types::{
-    AttachmentBlob, AttachmentInfo, Bitmap, Coordinate, DatasetSummary, Dimension,
-    DirectorySubBlockInfo, FileHeaderInfo, MetadataSummary, PlaneIndex, RawSubBlock,
-    SubBlockStatistics, SummaryChannel, SummaryScaling,
+    AttachmentInfo, Bitmap, Coordinate, DatasetSummary, Dimension, DirectorySubBlockInfo,
+    FileHeaderInfo, MetadataSummary, PlaneIndex, SubBlockStatistics, SummaryChannel,
+    SummaryScaling,
 };
 
 pub struct CziFile {
@@ -19,7 +17,7 @@ pub struct CziFile {
     reader: BufReader<File>,
     header: FileHeaderInfo,
     subblocks: Vec<DirectorySubBlockInfo>,
-    attachments: Vec<AttachmentInfo>,
+    _attachments: Vec<AttachmentInfo>,
     statistics: SubBlockStatistics,
     metadata_xml: Option<String>,
     metadata: Option<MetadataSummary>,
@@ -37,7 +35,7 @@ impl CziFile {
             reader,
             header: parsed.header,
             subblocks: parsed.subblocks,
-            attachments: parsed.attachments,
+            _attachments: parsed.attachments,
             statistics: parsed.statistics,
             metadata_xml: None,
             metadata: None,
@@ -52,32 +50,7 @@ impl CziFile {
         (self.header.major, self.header.minor)
     }
 
-    pub fn file_header(&self) -> &FileHeaderInfo {
-        &self.header
-    }
-
-    pub fn statistics(&self) -> &SubBlockStatistics {
-        &self.statistics
-    }
-
-    pub fn subblocks(&self) -> &[DirectorySubBlockInfo] {
-        &self.subblocks
-    }
-
-    pub fn attachments(&self) -> &[AttachmentInfo] {
-        &self.attachments
-    }
-
-    pub fn metadata_xml(&mut self) -> Result<&str> {
-        if self.metadata_xml.is_none() {
-            let xml = read_metadata_xml(&mut self.reader, self.header.metadata_position)?;
-            self.metadata_xml = Some(xml);
-        }
-
-        Ok(self.metadata_xml.as_deref().unwrap_or_default())
-    }
-
-    pub fn metadata(&mut self) -> Result<&MetadataSummary> {
+    fn metadata(&mut self) -> Result<&MetadataSummary> {
         if self.metadata.is_none() {
             if self.metadata_xml.is_none() {
                 let xml = read_metadata_xml(&mut self.reader, self.header.metadata_position)?;
@@ -98,19 +71,29 @@ impl CziFile {
         let metadata = self.metadata()?.clone();
         let logical_frame_count = self.loop_indices()?.len();
         let channel_pixel_types = self.channel_pixel_types();
-        let max_channel_count = metadata
-            .channels
-            .len()
-            .max(channel_pixel_types.keys().max().map(|index| index + 1).unwrap_or(0));
+        let max_channel_count = metadata.channels.len().max(
+            channel_pixel_types
+                .keys()
+                .max()
+                .map(|index| index + 1)
+                .unwrap_or(0),
+        );
         let channels = (0..max_channel_count)
             .map(|index| {
-                let metadata_channel = metadata.channels.iter().find(|channel| channel.index == index);
+                let metadata_channel = metadata
+                    .channels
+                    .iter()
+                    .find(|channel| channel.index == index);
                 SummaryChannel {
                     index,
                     name: metadata_channel.and_then(|channel| channel.name.clone()),
                     color: metadata_channel.and_then(|channel| channel.color.clone()),
                     pixel_type: metadata_channel
-                        .and_then(|channel| channel.pixel_type.map(|pixel_type| pixel_type.as_str().to_owned()))
+                        .and_then(|channel| {
+                            channel
+                                .pixel_type
+                                .map(|pixel_type| pixel_type.as_str().to_owned())
+                        })
                         .or_else(|| {
                             channel_pixel_types
                                 .get(&index)
@@ -140,12 +123,15 @@ impl CziFile {
             sizes: sizes.into_iter().collect(),
             logical_frame_count,
             channels,
-            pixel_type: metadata.image.pixel_type.map(|pixel_type| pixel_type.as_str().to_owned()),
+            pixel_type: metadata
+                .image
+                .pixel_type
+                .map(|pixel_type| pixel_type.as_str().to_owned()),
             scaling,
         })
     }
 
-    pub fn sizes(&self) -> Result<HashMap<String, usize>> {
+    fn sizes(&self) -> Result<HashMap<String, usize>> {
         let mut sizes = HashMap::new();
         for dimension in Dimension::FRAME_ORDER {
             sizes.insert(
@@ -174,7 +160,7 @@ impl CziFile {
         Ok(sizes)
     }
 
-    pub fn loop_indices(&self) -> Result<Vec<HashMap<String, usize>>> {
+    fn loop_indices(&self) -> Result<Vec<HashMap<String, usize>>> {
         let mut varying_dims = Vec::new();
         for dimension in Dimension::FRAME_ORDER {
             let size = self
@@ -199,7 +185,7 @@ impl CziFile {
         Ok(out)
     }
 
-    pub fn channel_pixel_types(&self) -> HashMap<usize, crate::types::PixelType> {
+    fn channel_pixel_types(&self) -> HashMap<usize, crate::types::PixelType> {
         let channel_start = self
             .statistics
             .dim_bounds
@@ -222,10 +208,6 @@ impl CziFile {
     }
 
     pub fn read_frame(&mut self, index: usize) -> Result<Vec<u16>> {
-        self.read_frame_bitmap(index)?.into_gray_u16()
-    }
-
-    pub fn read_frame_bitmap(&mut self, index: usize) -> Result<Bitmap> {
         let indices = self.loop_indices()?;
         if index >= indices.len() {
             return Err(CziError::input_out_of_range(
@@ -242,29 +224,19 @@ impl CziFile {
             })?;
             plane.set(dimension, *value);
         }
-        self.read_plane(&plane)
+        self.read_plane(&plane)?.into_gray_u16()
     }
 
     pub fn read_frame_2d(&mut self, s: usize, t: usize, c: usize, z: usize) -> Result<Vec<u16>> {
-        self.read_frame_2d_bitmap(s, t, c, z)?.into_gray_u16()
-    }
-
-    pub fn read_frame_2d_bitmap(
-        &mut self,
-        s: usize,
-        t: usize,
-        c: usize,
-        z: usize,
-    ) -> Result<Bitmap> {
         let plane = PlaneIndex::new()
             .with(Dimension::S, s)
             .with(Dimension::T, t)
             .with(Dimension::C, c)
             .with(Dimension::Z, z);
-        self.read_plane(&plane)
+        self.read_plane(&plane)?.into_gray_u16()
     }
 
-    pub fn read_plane(&mut self, index: &PlaneIndex) -> Result<Bitmap> {
+    fn read_plane(&mut self, index: &PlaneIndex) -> Result<Bitmap> {
         let actual = self.resolve_plane_index(index)?;
         let plane_rect = self
             .select_plane_rect(actual.get(Dimension::S))
@@ -313,21 +285,6 @@ impl CziFile {
 
         Ok(bitmap)
     }
-
-    pub fn read_subblock(&mut self, index: usize) -> Result<RawSubBlock> {
-        let subblock = self.subblocks.get(index).ok_or_else(|| {
-            CziError::input_out_of_range("subblock index", index, self.subblocks.len())
-        })?;
-        read_raw_subblock(&mut self.reader, subblock)
-    }
-
-    pub fn read_attachment(&mut self, index: usize) -> Result<AttachmentBlob> {
-        let attachment = self.attachments.get(index).ok_or_else(|| {
-            CziError::input_out_of_range("attachment index", index, self.attachments.len())
-        })?;
-        read_attachment_blob(&mut self.reader, attachment)
-    }
-
     fn resolve_plane_index(&self, index: &PlaneIndex) -> Result<Coordinate> {
         let mut actual = Coordinate::new();
 
