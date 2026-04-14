@@ -221,7 +221,11 @@ impl CziFile {
         pixel_types
     }
 
-    pub fn read_frame(&mut self, index: usize) -> Result<Bitmap> {
+    pub fn read_frame(&mut self, index: usize) -> Result<Vec<u16>> {
+        self.read_frame_bitmap(index)?.into_gray_u16()
+    }
+
+    pub fn read_frame_bitmap(&mut self, index: usize) -> Result<Bitmap> {
         let indices = self.loop_indices()?;
         if index >= indices.len() {
             return Err(CziError::input_out_of_range(
@@ -241,7 +245,17 @@ impl CziFile {
         self.read_plane(&plane)
     }
 
-    pub fn read_frame_2d(&mut self, s: usize, t: usize, c: usize, z: usize) -> Result<Bitmap> {
+    pub fn read_frame_2d(&mut self, s: usize, t: usize, c: usize, z: usize) -> Result<Vec<u16>> {
+        self.read_frame_2d_bitmap(s, t, c, z)?.into_gray_u16()
+    }
+
+    pub fn read_frame_2d_bitmap(
+        &mut self,
+        s: usize,
+        t: usize,
+        c: usize,
+        z: usize,
+    ) -> Result<Bitmap> {
         let plane = PlaneIndex::new()
             .with(Dimension::S, s)
             .with(Dimension::T, t)

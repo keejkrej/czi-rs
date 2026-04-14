@@ -58,6 +58,20 @@ fn reads_first_demo_plane() {
     let sizes = czi.sizes().expect("sizes");
     let plane = czi.read_frame(0).expect("read first plane");
 
+    assert_eq!(plane.len(), sizes["X"] * sizes["Y"]);
+}
+
+#[test]
+fn reads_first_demo_plane_bitmap() {
+    let Some(path) = demo_fixture() else {
+        eprintln!("skipping: fixture not found in {CZI_TEST_FILE}");
+        return;
+    };
+
+    let mut czi = CziFile::open(path).expect("open fixture");
+    let sizes = czi.sizes().expect("sizes");
+    let plane = czi.read_frame_bitmap(0).expect("read first plane bitmap");
+
     assert_eq!(plane.width as usize, sizes["X"]);
     assert_eq!(plane.height as usize, sizes["Y"]);
     assert_eq!(plane.data.len(), plane.stride * plane.height as usize);

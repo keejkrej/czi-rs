@@ -19,7 +19,8 @@ czi-rs = "0.1.0"
 - Build a lightweight dataset summary via `summary()`.
 - Inspect file header data, subblock directory entries, and attachments.
 - Read parsed metadata from the embedded XML document.
-- Enumerate frame indices and decode planes into a `Bitmap`.
+- Enumerate frame indices and decode planes into grayscale `Vec<u16>` buffers.
+- Drop to bitmap-level access explicitly when you need raw CZI pixel layouts.
 
 ## Example
 
@@ -44,10 +45,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(Dimension::T, 0)
         .with(Dimension::C, 0)
         .with(Dimension::Z, 0);
-    let bitmap = czi.read_plane(&plane)?;
+    let frame = czi.read_frame_2d(0, 0, 0, 0)?;
+    let bitmap = czi.read_frame_2d_bitmap(0, 0, 0, 0)?;
 
     println!(
-        "decoded {:?} plane: {}x{} ({} bytes)",
+        "decoded frame: {} pixels, bitmap {:?} {}x{} ({} bytes)",
+        frame.len(),
         bitmap.pixel_type,
         bitmap.width,
         bitmap.height,
@@ -60,9 +63,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Notes
 
-- Pixel data is returned as a raw interleaved byte buffer in `Bitmap::data`.
-- Helpers such as `Bitmap::to_u16_vec()` and `Bitmap::to_f32_vec()` are
-  available for compatible pixel formats.
+- `read_frame()` and `read_frame_2d()` return grayscale `Vec<u16>` buffers to
+  match the simple image-reader API used by `nd2-rs`.
+- `read_frame_bitmap()`, `read_frame_2d_bitmap()`, and `read_plane()` expose
+  raw/interleaved bitmap access when you need format-specific details.
+- Raw pixel data is stored as an interleaved byte buffer in `Bitmap::data`.
+- Helpers such as `Bitmap::to_u16_vec()`, `Bitmap::into_gray_u16()`, and
+  `Bitmap::to_f32_vec()` are available for compatible pixel formats.
 - Unsupported compression modes or pixel formats are reported as structured
   `CziError` values.
 

@@ -647,6 +647,34 @@ impl Bitmap {
         Ok(values)
     }
 
+    pub fn into_gray_u16(self) -> Result<Vec<u16>> {
+        let expected_len = self.width as usize * self.height as usize;
+        match self.pixel_type {
+            PixelType::Gray8 => Ok(self.data.into_iter().map(u16::from).collect()),
+            PixelType::Bgr24 | PixelType::Bgra32 => {
+                let channels = self.pixel_type.bytes_per_pixel();
+                let mut collapsed = Vec::with_capacity(expected_len);
+                for chunk in self.data.chunks_exact(channels) {
+                    let sum: u32 = chunk.iter().map(|value| u32::from(*value)).sum();
+                    collapsed.push((sum / channels as u32) as u16);
+                }
+                Ok(collapsed)
+            }
+            PixelType::Gray16 => self.to_u16_vec(),
+            PixelType::Bgr48 => {
+                let values = self.to_u16_vec()?;
+                let channels = 3usize;
+                let mut collapsed = Vec::with_capacity(expected_len);
+                for chunk in values.chunks_exact(channels) {
+                    let sum: u32 = chunk.iter().map(|value| u32::from(*value)).sum();
+                    collapsed.push((sum / channels as u32) as u16);
+                }
+                Ok(collapsed)
+            }
+            _ => Err(CziError::unsupported_pixel_type(self.pixel_type.as_str())),
+        }
+    }
+
     pub fn to_f32_vec(&self) -> Result<Vec<f32>> {
         if self.bytes_per_pixel() % 4 != 0 {
             return Err(CziError::unsupported_pixel_type(self.pixel_type.as_str()));
