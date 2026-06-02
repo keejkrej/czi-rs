@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 
 use crate::error::{CziError, Result};
+use crate::io::ReadSeek;
 use crate::metadata::parse_metadata_xml;
 use crate::parse::{decode_subblock_bitmap, parse_file, read_metadata_xml, read_raw_subblock};
 use crate::types::{
@@ -14,7 +15,7 @@ use crate::types::{
 
 pub struct CziFile {
     path: PathBuf,
-    reader: BufReader<File>,
+    reader: BufReader<Box<dyn ReadSeek>>,
     header: FileHeaderInfo,
     subblocks: Vec<DirectorySubBlockInfo>,
     _attachments: Vec<AttachmentInfo>,
@@ -24,15 +25,35 @@ pub struct CziFile {
 }
 
 impl CziFile {
+    pub fn open_reader<R>(reader: R) -> Result<Self>
+    where
+        R: Read + Seek + 'static,
+    {
+        Self::open_reader_at_path(PathBuf::from("<reader>"), reader)
+    }
+
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let file = File::open(&path)?;
-        let mut reader = BufReader::new(file);
-        let parsed = parse_file(&mut reader)?;
+        Self::open_reader_at_path(path, file)
+    }
 
+    #[cfg(feature = "smb")]
+    pub fn open_smb(path: &str) -> Result<Self> {
+        let reader = imaging_smb_io::open_path(path)
+            .map_err(|message| CziError::file_invalid_format(message))?;
+        Self::open_reader_at_path(PathBuf::from(path), reader)
+    }
+
+    fn open_reader_at_path<R>(path: PathBuf, reader: R) -> Result<Self>
+    where
+        R: Read + Seek + 'static,
+    {
+        let mut buffered = BufReader::new(Box::new(reader) as Box<dyn ReadSeek>);
+        let parsed = parse_file(&mut buffered)?;
         Ok(Self {
             path,
-            reader,
+            reader: buffered,
             header: parsed.header,
             subblocks: parsed.subblocks,
             _attachments: parsed.attachments,

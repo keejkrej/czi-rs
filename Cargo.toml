@@ -20,7 +20,12 @@ include = [
     "LICENSE-MIT",
 ]
 
+[features]
+default = []
+smb = ["dep:imaging-smb-io"]
+
 [dependencies]
 roxmltree = "0.20"
 thiserror = "1.0"
 zstd = "0.13"
+imaging-smb-io = { path = "../lisca/crates/imaging-smb-io", optional = true }
