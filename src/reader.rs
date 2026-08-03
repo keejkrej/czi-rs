@@ -38,13 +38,6 @@ impl CziFile {
         Self::open_reader_at_path(path, file)
     }
 
-    #[cfg(feature = "smb")]
-    pub fn open_smb(path: &str) -> Result<Self> {
-        let reader = mdat_smb_rs::open_path(path)
-            .map_err(|message| CziError::file_invalid_format(message))?;
-        Self::open_reader_at_path(PathBuf::from(path), reader)
-    }
-
     fn open_reader_at_path<R>(path: PathBuf, reader: R) -> Result<Self>
     where
         R: Read + Seek + 'static,

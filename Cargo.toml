@@ -20,12 +20,7 @@ include = [
     "LICENSE-MIT",
 ]
 
-[features]
-default = []
-smb = ["dep:mdat-smb-rs"]
-
 [dependencies]
 roxmltree = "0.20"
 thiserror = "1.0"
 zstd = "0.13"
-mdat-smb-rs = { git = "https://github.com/keejkrej/mdat-smb-rs", optional = true }
