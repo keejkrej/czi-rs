@@ -2,6 +2,8 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::{CziError, Result};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -553,30 +555,51 @@ pub struct MetadataSummary {
     pub channels: Vec<ChannelInfo>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Summary information for an individual image acquisition channel.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SummaryChannel {
+    /// Zero-based channel index.
     pub index: usize,
+    /// Channel display name, if defined in file metadata.
     pub name: Option<String>,
+    /// Channel display color (e.g. hex or XML color string), if defined.
     pub color: Option<String>,
+    /// Pixel data type name for this channel (e.g. "Gray16", "Bgr24").
     pub pixel_type: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// Physical spatial calibration and unit metadata.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SummaryScaling {
+    /// Physical pixel size along the X axis.
     pub x: Option<f64>,
+    /// Physical pixel size along the Y axis.
     pub y: Option<f64>,
+    /// Physical voxel step along the Z axis.
     pub z: Option<f64>,
+    /// Calibration distance unit (e.g. "µm", "m").
     pub unit: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// Lightweight, comprehensive overview of a microscopy dataset.
+///
+/// Provides key structural parameters including file version, dimension sizes,
+/// logical frame counts, channel configurations, and physical scaling calibration.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DatasetSummary {
+    /// Major format version.
     pub version_major: u32,
+    /// Minor format version.
     pub version_minor: u32,
+    /// Dimension map mapping dimension codes (e.g. "X", "Y", "C", "Z", "T", "S") to sizes.
     pub sizes: BTreeMap<String, usize>,
+    /// Total number of logical frames (acquisitions) across all non-spatial dimensions.
     pub logical_frame_count: usize,
+    /// Metadata for each channel present in the dataset.
     pub channels: Vec<SummaryChannel>,
+    /// Primary or default pixel format name across the dataset.
     pub pixel_type: Option<String>,
+    /// Spatial scaling calibration if recorded in the metadata.
     pub scaling: Option<SummaryScaling>,
 }
 

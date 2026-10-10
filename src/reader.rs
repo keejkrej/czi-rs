@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
@@ -13,8 +13,9 @@ use crate::types::{
     SummaryScaling,
 };
 
+/// Main reader for Zeiss CZI microscopy files.
 pub struct CziFile {
-    path: PathBuf,
+    path: Option<PathBuf>,
     reader: BufReader<Box<dyn ReadSeek>>,
     header: FileHeaderInfo,
     subblocks: Vec<DirectorySubBlockInfo>,
@@ -25,20 +26,22 @@ pub struct CziFile {
 }
 
 impl CziFile {
+    /// Open a CZI file from any [`Read`] + [`Seek`] source (e.g. in-memory buffer).
     pub fn open_reader<R>(reader: R) -> Result<Self>
     where
         R: Read + Seek + 'static,
     {
-        Self::open_reader_at_path(PathBuf::from("<reader>"), reader)
+        Self::open_internal(None, reader)
     }
 
+    /// Open a CZI file for reading from a local filesystem path.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let file = File::open(&path)?;
-        Self::open_reader_at_path(path, file)
+        Self::open_internal(Some(path), file)
     }
 
-    fn open_reader_at_path<R>(path: PathBuf, reader: R) -> Result<Self>
+    fn open_internal<R>(path: Option<PathBuf>, reader: R) -> Result<Self>
     where
         R: Read + Seek + 'static,
     {
@@ -56,13 +59,30 @@ impl CziFile {
         })
     }
 
-    pub fn path(&self) -> &Path {
-        &self.path
+    /// Returns the filesystem path to this file, if opened from a path.
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
     }
 
-    pub fn version(&self) -> (i32, i32) {
-        (self.header.major, self.header.minor)
+    /// Get the format version (major, minor).
+    pub fn version(&self) -> (u32, u32) {
+        (
+            self.header.major.max(0) as u32,
+            self.header.minor.max(0) as u32,
+        )
     }
+}
+
+impl std::fmt::Debug for CziFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CziFile")
+            .field("path", &self.path)
+            .field("version", &self.version())
+            .finish_non_exhaustive()
+    }
+}
+
+impl CziFile {
 
     fn metadata(&mut self) -> Result<&MetadataSummary> {
         if self.metadata.is_none() {
@@ -80,8 +100,9 @@ impl CziFile {
         Ok(self.metadata.as_ref().unwrap())
     }
 
+    /// Return a lightweight dataset overview containing dimensions, channels, and scaling.
     pub fn summary(&mut self) -> Result<DatasetSummary> {
-        let sizes = self.sizes()?;
+        let sizes = self.sizes_internal()?;
         let metadata = self.metadata()?.clone();
         let logical_frame_count = self.loop_indices()?.len();
         let channel_pixel_types = self.channel_pixel_types();
@@ -145,7 +166,13 @@ impl CziFile {
         })
     }
 
-    fn sizes(&self) -> Result<HashMap<String, usize>> {
+    /// Returns the dataset dimension sizes (e.g. "X", "Y", "C", "Z", "T", "S").
+    pub fn sizes(&self) -> Result<BTreeMap<String, usize>> {
+        let sizes = self.sizes_internal()?;
+        Ok(sizes.into_iter().collect())
+    }
+
+    fn sizes_internal(&self) -> Result<HashMap<String, usize>> {
         let mut sizes = HashMap::new();
         for dimension in Dimension::FRAME_ORDER {
             sizes.insert(
@@ -221,6 +248,9 @@ impl CziFile {
         pixel_types
     }
 
+    /// Read one logical 2D frame by flat index (0..logical_frame_count).
+    ///
+    /// Returns decoded grayscale pixels as `Vec<u16>` in row-major order (height x width).
     pub fn read_frame(&mut self, index: usize) -> Result<Vec<u16>> {
         let indices = self.loop_indices()?;
         if index >= indices.len() {
@@ -241,6 +271,9 @@ impl CziFile {
         self.read_plane(&plane)?.into_gray_u16()
     }
 
+    /// Read a 2D plane at the specified coordinates: Scene (`s`), Time (`t`), Channel (`c`), and Z-slice (`z`).
+    ///
+    /// Returns decoded grayscale pixels as `Vec<u16>` in row-major order (height x width).
     pub fn read_frame_2d(&mut self, s: usize, t: usize, c: usize, z: usize) -> Result<Vec<u16>> {
         let plane = PlaneIndex::new()
             .with(Dimension::S, s)
