@@ -1,15 +1,15 @@
-# czi-rs
+# czi
 
 Pure Rust reader for Zeiss CZI microscopy files.
 
-`czi-rs` is a small, dependency-light library for reading CZI datasets through
+`czi` is a small, dependency-light library for reading CZI datasets through
 one simple public surface: dataset summary plus frame reads.
 
 ## Install
 
 ```toml
 [dependencies]
-czi-rs = "0.2.0"
+czi = "0.2.0"
 ```
 
 ## What it exposes
@@ -22,7 +22,7 @@ czi-rs = "0.2.0"
 ## Example
 
 ```rust,no_run
-use czi_rs::CziFile;
+use czi::CziFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut czi = CziFile::open("example.czi")?;
