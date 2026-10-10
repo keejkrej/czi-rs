@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use czi_rs::CziFile;
+use czi::CziFile;
 
 const CZI_TEST_FILE: &str = "CZI_TEST_FILE";
 

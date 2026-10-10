@@ -1,12 +1,12 @@
 [package]
-name = "czi-rs"
+name = "czi"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.74"
 description = "Pure Rust reader for Zeiss CZI microscopy files"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/czi-rs"
+documentation = "https://docs.rs/czi"
 repository = "https://github.com/keejkrej/czi-rs"
 keywords = ["czi", "zeiss", "microscopy", "bioimaging", "image"]
 categories = ["science", "multimedia::images", "parser-implementations"]
