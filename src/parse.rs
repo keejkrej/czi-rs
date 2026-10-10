@@ -342,7 +342,7 @@ fn parse_subblock_directory<R: Read + Seek>(
             .ok_or_else(|| CziError::unsupported_compression(compression_raw.to_string()))?;
         let pyramid_type = SubBlockPyramidType::from_raw(payload[cursor + 22]);
         let dimension_count = le_i32(&payload, cursor + 28)?;
-        if dimension_count < 0 || dimension_count > 1024 {
+        if !(0..=1024).contains(&dimension_count) {
             return Err(CziError::file_invalid_format(format!(
                 "invalid dimension count {} in subblock directory",
                 dimension_count

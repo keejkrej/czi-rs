@@ -77,15 +77,32 @@ pub enum UnsupportedError {
     PixelType { pixel_type: String },
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+/// High-level classification of where an error originated.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ErrorSource {
+    /// Errors arising from invalid, corrupt, or truncated file content.
     File,
+    /// Errors caused by out-of-range indices or invalid caller arguments.
     Input,
+    /// Errors caused by internal invariants or arithmetic overflow.
     Internal,
+    /// Errors caused by unsupported format features (compression, schemas, pixel types).
     Unsupported,
 }
 
+impl std::fmt::Display for ErrorSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::File => write!(f, "File"),
+            Self::Input => write!(f, "Input"),
+            Self::Internal => write!(f, "Internal"),
+            Self::Unsupported => write!(f, "Unsupported"),
+        }
+    }
+}
+
 impl CziError {
+    /// Return the category / source of this error.
     pub fn source(&self) -> ErrorSource {
         match self {
             Self::File { .. } => ErrorSource::File,
@@ -93,6 +110,26 @@ impl CziError {
             Self::Internal { .. } => ErrorSource::Internal,
             Self::Unsupported { .. } => ErrorSource::Unsupported,
         }
+    }
+
+    /// True if the error was caused by invalid, corrupt, or unreadable file contents.
+    pub fn is_file(&self) -> bool {
+        matches!(self, Self::File { .. })
+    }
+
+    /// True if the error was caused by invalid caller inputs or out-of-range coordinates.
+    pub fn is_input(&self) -> bool {
+        matches!(self, Self::Input { .. })
+    }
+
+    /// True if the error was caused by an internal logic failure or arithmetic overflow.
+    pub fn is_internal(&self) -> bool {
+        matches!(self, Self::Internal { .. })
+    }
+
+    /// True if the error was caused by an unsupported file feature or format variant.
+    pub fn is_unsupported(&self) -> bool {
+        matches!(self, Self::Unsupported { .. })
     }
 
     pub fn file_invalid_format(context: impl Into<String>) -> Self {

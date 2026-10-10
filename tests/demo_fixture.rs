@@ -6,8 +6,14 @@ use czi::CziFile;
 const CZI_TEST_FILE: &str = "CZI_TEST_FILE";
 
 fn demo_fixture() -> Option<PathBuf> {
-    let path = env::var_os(CZI_TEST_FILE).map(PathBuf::from)?;
-    path.exists().then_some(path)
+    if let Some(path) = env::var_os(CZI_TEST_FILE).map(PathBuf::from) {
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    let local = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/Plate1-Blue-A-02-Scene-1-P2-E1-01.czi");
+    local.exists().then_some(local)
 }
 
 #[test]
